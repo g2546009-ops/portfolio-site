@@ -74,7 +74,7 @@ fetch("work.csv")
                 grid.appendChild(card);
             });
         }
-        
+
         displayWorks();
 
         categorySelect.addEventListener("change", function() {
@@ -125,4 +125,3 @@ fetch("work.csv")
             document.body.className = "weather-cloudy";
         }
     }
-    

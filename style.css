@@ -122,7 +122,6 @@ h3 {
     color: var(--accent);
 }
 
-/* 自己紹介 */
 #about {
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
@@ -139,7 +138,40 @@ h3 {
     color: var(--muted);
 }
 
-/* 国の一覧 */
+.favorite-artist {
+    margin-top: 28px;
+}
+
+.favorite-artist h4 {
+    margin: 0 0 10px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+#about .artist-description {
+    margin: 0;
+    font-size: 14px;
+    line-height: 2;
+    color: var(--muted);
+}
+
+.artist-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    margin-top: 14px;
+}
+
+.artist-links a {
+    font-size: 13px;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.artist-links a:hover {
+    color: var(--accent);
+}
+
 #journey {
     padding-top: 65px;
 }
@@ -158,8 +190,15 @@ h3 {
     color: var(--muted);
 }
 
+.external-note {
+    font-size: 13px;
+    color: var(--muted);
+}
+
 .works-controls {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 12px;
     margin-top: 20px;
     margin-bottom: 30px;
@@ -359,9 +398,11 @@ body.weather-rainy {
 
     .works-controls {
         flex-direction: column;
+        align-items: stretch;
     }
 
     .works-controls select {
+        min-width: 0;
         width: 100%;
     }
 
@@ -369,6 +410,7 @@ body.weather-rainy {
         margin: 0 24px;
     }
 }
+
 @media (prefers-reduced-motion: reduce) {
     html {
         scroll-behavior: auto;
@@ -380,6 +422,7 @@ body.weather-rainy {
         transition: none !important;
     }
 }
+/* 好きなアーティスト */
 .favorite-artist {
     margin-top: 32px;
     padding: 28px;

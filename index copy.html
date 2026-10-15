@@ -1,91 +1,105 @@
 <!DOCTYPE html>
-<html long="ja">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Yuto Ito</title>
-        <link rel="stylesheet" href="style.css">
-    </head>
-    <body>
-        <header>
-            <a href="#top">Yuto Ito</a>
-            <nav>
-                <a href="#about">About</a>
-                <a href="#journey">Journey</a>
-            </nav>
-        </header>
-    
-        <main>
-            <section id="top">
-                <img src="media/20260925164111876652.jpg" width="200">
-                <h1>
-                    Yuto Ito<br>
-                    Portfolio
-                </h1>
-                <p id="weather-icon"> </p>
-            </section>
-            <section id="about">
-                <h3>About</h3>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yuto Ito</title>
+    <link rel="stylesheet" href="style.css">
+</head>
 
-                <p>
-                    伊藤 勇翔<br>
-                </p>
+<body>
+    <header>
+        <a href="#top">Yuto Ito</a>
 
-                <p>趣味：ライブハウス巡り</p>
+        <nav>
+            <a href="#about">About</a>
+            <a href="#journey">Journey</a>
+        </nav>
+    </header>
 
-                <div class="favorite-artist">
-                    <span class="artist-label">MY FAVORITE ARTIST</span>
-                    <h4>フジタカコ</h4>
+    <main>
+        <section id="top">
+            <img
+                src="media/20260925164111876652.jpg"
+                alt="伊藤勇翔のプロフィール写真"
+                width="200"
+            >
 
-                    <p class="artist-description">
-                        力強いギターストロークと心に響く歌声が魅力の
-                        シンガーソングライター
-                    </p>
+            <h1>
+                Yuto Ito<br>
+                Portfolio
+            </h1>
 
-                    <div class="artist-links">
-                        <a href="https://open.spotify.com/intl-ja/artist/7zickYqNm26rlWgRWS7wtg"
-                        target="_blank" rel="noopener noreferrer">
-                            Spotifyで聴く ↗
-                        </a>
+            <p id="weather-icon"></p>
+        </section>
 
-                        <a href="https://fujitakako.com/"
-                        target="_blank" rel="noopener noreferrer">
-                            公式サイト ↗
-                        </a>
+        <section id="about">
+    <h3>About</h3>
 
-                        <a href="https://fujitakako.bitfan.id/"
-                        target="_blank" rel="noopener noreferrer">
-                            ファンクラブ ↗
-                        </a>
-                    </div>
-                </div>
-            </section>
-            <section id="journey">
+    <p>
+        伊藤 勇翔<br>
+    </p>
+
+    <p>趣味：ライブハウス巡り</p>
+
+    <div class="favorite-artist">
+        <span class="artist-label">MY FAVORITE ARTIST</span>
+        <h4>フジタカコ</h4>
+
+        <p class="artist-description">
+            力強いギターストロークと心に響く歌声が魅力の
+            シンガーソングライター
+        </p>
+
+        <div class="artist-links">
+            <a href="https://open.spotify.com/intl-ja/artist/7zickYqNm26rlWgRWS7wtg"
+               target="_blank" rel="noopener noreferrer">
+                Spotifyで聴く ↗
+            </a>
+
+            <a href="https://fujitakako.com/"
+               target="_blank" rel="noopener noreferrer">
+                公式サイト ↗
+            </a>
+
+            <a href="https://fujitakako.bitfan.id/"
+               target="_blank" rel="noopener noreferrer">
+                ファンクラブ ↗
+            </a>
+        </div>
+    </div>
+</section>
+
+        <section id="journey">
             <h3>Journey</h3>
+
             <section id="works" class="works">
                 <h3>Countries</h3>
 
                 <p class="external-note">
-                        各国のカードをクリックすると、公式観光サイトが別タブで開きます。
+                    各国のカードをクリックすると、公式観光サイトが別タブで開きます。
                 </p>
+
                 <div class="works-controls">
-                <div class="works-controls">
-                    <select id="category">
+                    <select id="category" aria-label="カテゴリ">
                         <option value="all">すべてのカテゴリ</option>
                     </select>
 
-                    <select id="sort">
+                    <select id="sort" aria-label="並び替え">
                         <option value="default">元の順番</option>
                         <option value="title">名前順</option>
                     </select>
                 </div>
+
                 <div id="works-grid"></div>
             </section>
-            </section>
-        </main>
-        <footer>
-            <span>© 2026 Yuto Ito</span>
-        </footer>
-        <script src="works.js"></script>
-    </body>
+        </section>
+    </main>
+
+    <footer>
+        <span>© 2026 Yuto Ito</span>
+    </footer>
+
+    <script src="works.js"></script>
+</body>
 </html>
