@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="description"
+        content="伊藤勇翔のポートフォリオ。自己紹介、好きな音楽、世界の国々を紹介します。"
+    >
+
+    <title>Yuto Ito | Portfolio</title>
+
+    <link rel="stylesheet" href="style.css?v=5">
+    <script src="works.js?v=5" defer></script>
+</head>
+
+<body>
+    <div class="scroll-progress" aria-hidden="true"></div>
+
+    <header>
+        <a class="site-name" href="#top">Yuto Ito</a>
+
+        <nav aria-label="メインメニュー">
+            <a href="#about">About</a>
+            <a href="#journey">My Journey</a>
+        </nav>
+    </header>
+
+    <main>
+        <!-- トップ -->
+        <section id="top">
+            <div class="profile-photo">
+                <img
+                    src="media/profile.jpg"
+                    alt="伊藤勇翔のプロフィール写真"
+                    width="300"
+                    height="400"
+                    fetchpriority="high"
+                >
+            </div>
+
+            <div class="top-content">
+                <p class="section-label">WELCOME TO MY PAGE</p>
+
+                <h1>
+                    <span>Yuto Ito</span>
+                    <span>Portfolio</span>
+                </h1>
+
+                <div class="weather" role="status">
+                    <span id="weather-icon">◌</span>
+                    <span id="weather-text">TOKYO</span>
+                </div>
+
+                <a class="scroll-link" href="#about">
+                    Scroll down
+                    <span aria-hidden="true">↓</span>
+                </a>
+            </div>
+        </section>
+
+        <section id="about">
+            <div class="section-heading reveal">
+                <p class="section-label">01 / ABOUT ME</p>
+                <h2>About</h2>
+            </div>
+
+            <div class="about-profile reveal">
+                <p class="japanese-name">伊藤 勇翔</p>
+                <p class="english-name">YUTO ITO</p>
+
+                <p>
+                    東京生まれ、東京育ち<br>
+                </p>
+
+                <p>趣味：ライブハウス巡り</p>
+            </div>
+            <div class="artist-wrapper reveal">
+                <div class="favorite-artist">
+                    <div class="artist-topline">
+                        <span>MY FAVORITE ARTIST</span>
+                        <span>TURN IT UP ↗</span>
+                    </div>
+
+                    <p class="artist-catch">
+                        この声に、心をつかまれる。
+                    </p>
+
+                    <h3>
+                        フジタカコ
+                        <span>FUJITAKAKO</span>
+                    </h3>
+
+                    <div class="artist-description">
+                        <p>
+                            力強いギターストロークと、心に響く歌声。
+                        </p>
+                        <p>
+                            歌とギターで会場を惹きつける、
+                            シンガーソングライター。
+                        </p>
+                    </div>
+
+                    <div class="equalizer" aria-hidden="true">
+                        <i></i><i></i><i></i><i></i><i></i>
+                        <i></i><i></i><i></i><i></i><i></i>
+                        <i></i><i></i><i></i><i></i><i></i>
+                    </div>
+
+                    <div class="artist-links">
+                        <a
+                            href="https://open.spotify.com/intl-ja/artist/7zickYqNm26rlWgRWS7wtg"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Spotifyで聴く ↗
+                        </a>
+
+                        <a
+                            href="https://fujitakako.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            公式サイト ↗
+                        </a>
+                    </div>
+
+                    <a
+                        class="fanclub-cta"
+                        href="https://fujitakako.bitfan.id/"
+                    >
+                        <span class="fanclub-label">
+                            もっとフジタカコを好きになる。
+                        </span>
+
+                        <span class="fanclub-title">
+                            ファンクラブ、<br class="mobile-break">
+                            のぞいてみない？
+                            <span aria-hidden="true">↗</span>
+                        </span>
+
+                        <span class="fanclub-note">
+                            クリックしたあなたを、大歓迎でお迎えします！
+                        </span>
+                    </a>
+                </div>
+            </div>
+        </section>
+        <section id="journey">
+            <div class="section-heading reveal">
+                <p class="section-label">02 / PLACES & PERSPECTIVES</p>
+                <h2>My Journey</h2>
+            </div>
+
+            <div id="works">
+                <p class="external-note reveal">
+                    各国のカードをクリックすると、
+                    公式観光サイトが別タブで開きます。
+                </p>
+
+                <div class="works-controls reveal">
+                    <label>
+                        地域
+                        <select id="category">
+                            <option value="all">すべての地域</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        <select id="sort">
+                            <option value="default">元の順番</option>
+                            <option value="title">名前順</option>
+                        </select>
+                    </label>
+                </div>
+
+                <p id="result-count" aria-live="polite"></p>
+
+                <div id="works-grid"></div>
+
+                <p id="works-message" role="status">
+                </p>
+            </div>
+        </section>
+
+        <div class="back-to-top">
+            <a href="#top">Back to top ↑</a>
+        </div>
+    </main>
+
+    <footer>
+        <span>© 2026 Yuto Ito</span>
+    </footer>
+
+    <button
+        id="motion-toggle"
+        type="button"
+        aria-pressed="false"
+        hidden
+    >
+        動きを止める Ⅱ
+    </button>
+    <dialog
+        id="fanclub-welcome"
+        aria-labelledby="welcome-title"
+        aria-describedby="welcome-description"
+    >
+        <canvas id="fireworks" aria-hidden="true"></canvas>
+
+        <div class="welcome-content">
+            <p class="welcome-label">YOU’RE VERY WELCOME!</p>
+
+            <div class="welcome-star" aria-hidden="true">✳</div>
+
+            <h2 id="welcome-title">
+                ようこそ、<br>
+                フジタカコの世界へ！
+            </h2>
+
+            <p id="welcome-description">
+                気になってくれて、ありがとう。<br>
+                もっと好きになるきっかけが、きっとある。
+            </p>
+
+            <a
+                class="welcome-go"
+                href="https://fujitakako.bitfan.id/"
+            >
+                ファンクラブサイトへ進む ↗
+            </a>
+
+            <p id="welcome-count" role="status"></p>
+
+            <button class="welcome-cancel" type="button">
+                戻る・移動をキャンセル
+            </button>
+        </div>
+    </dialog>
+</body>
+</html>
