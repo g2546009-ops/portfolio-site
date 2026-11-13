@@ -1,83 +1,112 @@
 const RECORD_KEY = "muscle-log-records-v1";
 const CUSTOM_KEY = "muscle-log-custom-exercises-v1";
+
 const parts = MuscleMap.parts;
+const weekdays = ["月", "火", "水", "木", "金", "土", "日"];
+
+const weekGroups = {
+    chest: ["胸", ["upperChest", "chest"]],
+    shoulders: ["肩", ["frontShoulder", "sideShoulder", "rearShoulder"]],
+    biceps: ["二頭筋", ["biceps"]],
+    core: ["体幹", ["abs", "obliques"]],
+    quads: ["前太もも", ["quads", "adductors"]],
+    back: ["背中", ["upperTraps", "upperBack", "lowerTraps", "lats", "erectors"]],
+    triceps: ["三頭筋", ["triceps"]],
+    forearms: ["前腕", ["forearms", "forearmExtensors"]],
+    glutes: ["お尻", ["glutes", "gluteMedius"]],
+    hamstrings: ["裏太もも", ["hamstrings"]],
+    calves: ["下腿", ["calves", "soleus", "shins"]]
+};
 
 let exercises = [];
 let records = [];
 let screen = "today";
-let historyDate = "";
+let activeDate = "";
 let view = "front";
 let selectedPart = "";
-let muscleCounts = new Map();
+let todayCounts = new Map();
 let previousSets = [];
-
 let editing = null;
-let activeGuideId = "";
-let animationFrame = null;
+
+let weekOffset = 0;
+let weekSelection = { label: "", ids: [] };
+
+let guideId = "";
+let frame = null;
 let elapsed = 0;
-let lastFrameTime = null;
+let lastFrame = null;
 
 function byId(id) {
     return document.getElementById(id);
 }
 
-function getToday() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
+function append(parent, tag, text = "", className = "") {
+    const element = document.createElement(tag);
+
+    element.textContent = text;
+    element.className = className;
+    parent.append(element);
+
+    return element;
+}
+
+function button(parent, label, handler) {
+    const element = append(parent, "button", label);
+
+    element.type = "button";
+    element.addEventListener("click", handler);
+
+    return element;
+}
+
+function option(parent, value, label) {
+    const element = append(parent, "option", label);
+
+    element.value = value;
+
+    return element;
+}
+
+function dateKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
 }
 
-function formatDate(date) {
-    return date.replaceAll("-", "/");
+function todayKey() {
+    return dateKey(new Date());
 }
 
-function formatSet(set) {
-    if (set.weight == null) {
-        return `${set.reps}回`;
-    }
+function weekDates(offset) {
+    const monday = new Date();
+    const daysSinceMonday = (monday.getDay() + 6) % 7;
 
-    return `${set.weight}kg × ${set.reps}回`;
-}
+    monday.setHours(12, 0, 0, 0);
+    monday.setDate(monday.getDate() - daysSinceMonday + 7 * offset);
 
-function appendText(parent, tag, text, className = "") {
-    const item = document.createElement(tag);
+    return weekdays.map((weekday, index) => {
+        const date = new Date(monday);
 
-    item.textContent = text;
-    item.className = className;
-    parent.append(item);
+        date.setDate(monday.getDate() + index);
 
-    return item;
-}
-
-function appendButton(parent, label, handler) {
-    const button = appendText(parent, "button", label);
-
-    button.type = "button";
-    button.addEventListener("click", handler);
-
-    return button;
-}
-
-function option(value, label) {
-    const item = document.createElement("option");
-
-    item.value = value;
-    item.textContent = label;
-
-    return item;
+        return {
+            key: dateKey(date),
+            short: `${date.getMonth() + 1}/${date.getDate()}`,
+            weekday
+        };
+    });
 }
 
 function readArray(key) {
-    const data = JSON.parse(localStorage.getItem(key) ?? "[]");
+    const value = JSON.parse(localStorage.getItem(key) ?? "[]");
 
-    if (!Array.isArray(data)) {
-        throw new Error("保存データの形式を確認してください。");
+    if (!Array.isArray(value)) {
+        throw new Error("保存データの形式が正しくありません。");
     }
 
-    return data;
+    return value;
 }
 
 function writeRecords(nextRecords) {
@@ -85,40 +114,11 @@ function writeRecords(nextRecords) {
     records = nextRecords;
 }
 
-async function loadExercises() {
-    const response = await fetch("work.csv");
-
-    if (!response.ok) {
-        throw new Error("work.csvを読み込めませんでした。");
-    }
-
-    const csv = await response.text();
-    const lines = csv.trim().split(/\r?\n/).slice(1);
-    const items = new Map();
-
-    for (const line of lines) {
-        if (!line.trim()) {
-            continue;
-        }
-
-        const [id, name, main, secondary] = line.split(",");
-
-        items.set(id, {
-            id,
-            name,
-            main: main.split("|"),
-            secondary: secondary ? secondary.split("|") : []
-        });
-    }
-
-    return [...items.values()];
-}
-
-function getExercise(id) {
+function exerciseById(id) {
     return exercises.find((exercise) => exercise.id === id);
 }
 
-function getEntries(date) {
+function entriesFor(date) {
     const entries = new Map();
 
     for (const record of records) {
@@ -128,162 +128,128 @@ function getEntries(date) {
 
         if (!entries.has(record.exerciseId)) {
             entries.set(record.exerciseId, {
-                exerciseId: record.exerciseId,
-                name: record.name,
-                main: [...record.main],
+                ...record,
                 sets: []
             });
         }
 
-        const entry = entries.get(record.exerciseId);
-
-        entry.sets.push(...record.sets);
+        entries.get(record.exerciseId).sets.push(...record.sets);
     }
 
     return [...entries.values()];
 }
 
-function countSets(entries) {
-    return entries.reduce((sum, entry) => sum + entry.sets.length, 0);
+function formatSet(set) {
+    return set.weight == null
+        ? `${set.reps}回`
+        : `${set.weight} kg × ${set.reps}回`;
 }
 
-function countMuscles(entries) {
-    const counts = new Map();
+function describeExercise(exercise) {
+    const names = exercise.main.map((id) => parts[id]?.name ?? id);
+    const support = (exercise.secondary ?? []).map((id) => parts[id]?.name ?? id);
 
-    for (const entry of entries) {
-        for (const id of new Set(entry.main)) {
-            counts.set(id, (counts.get(id) ?? 0) + 1);
-        }
-    }
-
-    return counts;
+    return `主に狙う部位 · ${names.join("・")}` +
+        (support.length ? ` ／ 補助 · ${support.join("・")}` : "");
 }
 
-function fillPartSelect(select) {
-    select.replaceChildren(option("", "部位を選ぶ"));
+function fillParts(select) {
+    option(select, "", "部位を選ぶ");
 
     for (const side of ["front", "back"]) {
-        const group = document.createElement("optgroup");
+        const group = append(select, "optgroup");
 
         group.label = side === "front" ? "前面" : "背面";
 
         for (const part of Object.values(parts)) {
             if (part.view === side) {
-                group.append(option(part.id, part.name));
+                option(group, part.id, part.name);
             }
         }
-
-        select.append(group);
     }
 }
 
-function appendExerciseGroup(select, label, items) {
+function addExerciseGroup(select, label, items) {
     if (items.length === 0) {
         return;
     }
 
-    const group = document.createElement("optgroup");
+    const group = append(select, "optgroup");
 
     group.label = label;
 
     for (const exercise of items) {
-        group.append(option(exercise.id, exercise.name));
-    }
-
-    select.append(group);
-}
-
-function renderExerciseOptions(preferred = "", chooseRecommended = false) {
-    const select = byId("exerciseSelect");
-    const recommended = exercises.filter((exercise) => exercise.main.includes(selectedPart));
-    const other = exercises.filter((exercise) => !exercise.main.includes(selectedPart));
-
-    select.replaceChildren(option("", "種目を選ぶ"));
-
-    appendExerciseGroup(select, "この部位のおすすめ", recommended);
-    appendExerciseGroup(select, selectedPart ? "その他の種目" : "全種目", other);
-
-    if (getExercise(preferred)) {
-        select.value = preferred;
-    } else if (chooseRecommended && recommended.length > 0) {
-        select.value = recommended[0].id;
+        option(group, exercise.id, exercise.name);
     }
 }
 
-function describeExercise(exercise) {
-    if (!exercise) {
-        return "";
-    }
+function renderExerciseOptions(preferred = "", autoSelect = false) {
+    const select = byId("exercise");
+    const recommended = exercises.filter((item) => item.main.includes(selectedPart));
+    const others = exercises.filter((item) => !item.main.includes(selectedPart));
 
-    const main = exercise.main.map((id) => parts[id]?.name ?? id);
-    const secondary = exercise.secondary.map((id) => parts[id]?.name ?? id);
+    select.replaceChildren();
+    option(select, "", "種目を選ぶ");
 
-    let text = `主に狙う部位 · ${main.join("・")}`;
+    addExerciseGroup(select, "この部位のおすすめ", recommended);
+    addExerciseGroup(select, selectedPart ? "その他の種目" : "全種目", others);
 
-    if (secondary.length > 0) {
-        text += ` ／ 補助 · ${secondary.join("・")}`;
-    }
-
-    return text;
+    select.value = exerciseById(preferred)
+        ? preferred
+        : autoSelect ? recommended[0]?.id ?? "" : "";
 }
 
-function renumberRows(list) {
+function numberRows(list) {
     const rows = [...list.children];
 
     for (const [index, row] of rows.entries()) {
         const number = index + 1;
-        const remove = row.querySelector("button");
 
-        row.querySelector(".set-number").textContent = number;
+        row.firstElementChild.textContent = number;
         row.querySelector(".weight").setAttribute("aria-label", `セット${number}の重量（kg）`);
         row.querySelector(".reps").setAttribute("aria-label", `セット${number}の回数`);
-
-        remove.setAttribute("aria-label", `セット${number}を削除`);
-        remove.disabled = rows.length === 1;
+        row.lastElementChild.setAttribute("aria-label", `セット${number}を削除`);
+        row.lastElementChild.disabled = rows.length === 1;
     }
 }
 
-function addSetRow(list, set = {}) {
-    const row = appendText(list, "div", "", "set-grid");
+function addRow(list, set = {}) {
+    const row = append(list, "div", "", "set-grid");
 
-    appendText(row, "span", "", "set-number");
+    append(row, "span");
 
-    const weight = document.createElement("input");
+    const weight = append(row, "input", "", "weight");
 
-    weight.className = "weight";
     weight.type = "number";
     weight.min = "0";
     weight.step = "any";
     weight.value = set.weight ?? "";
 
-    const reps = document.createElement("input");
+    const reps = append(row, "input", "", "reps");
 
-    reps.className = "reps";
     reps.type = "number";
     reps.min = "1";
     reps.step = "1";
     reps.required = true;
     reps.value = set.reps ?? "";
 
-    row.append(weight, reps);
-
-    appendButton(row, "×", () => {
+    button(row, "×", () => {
         row.remove();
-        renumberRows(list);
+        numberRows(list);
     });
 
-    renumberRows(list);
+    numberRows(list);
 }
 
-function fillSetRows(list, sets) {
+function fillRows(list, sets) {
     list.replaceChildren();
 
     for (const set of sets) {
-        addSetRow(list, set);
+        addRow(list, set);
     }
 }
 
-function readSets(list) {
+function readRows(list) {
     return [...list.children].map((row) => {
         const weight = row.querySelector(".weight");
         const reps = row.querySelector(".reps");
@@ -295,41 +261,34 @@ function readSets(list) {
     });
 }
 
-function updatePreviousRecord() {
-    const exerciseId = byId("exerciseSelect").value;
-    const today = getToday();
+function updatePrevious() {
+    const id = byId("exercise").value;
 
-    const previousDate = records
-        .filter((record) => record.exerciseId === exerciseId && record.date < today)
+    const date = records
+        .filter((record) => record.exerciseId === id && record.date < todayKey())
         .map((record) => record.date)
         .sort()
         .pop();
 
-    previousSets = [];
+    previousSets = date
+        ? entriesFor(date).find((entry) => entry.exerciseId === id).sets
+        : [];
 
-    if (previousDate) {
-        const entry = getEntries(previousDate).find((item) => {
-            return item.exerciseId === exerciseId;
-        });
-
-        previousSets = entry.sets;
-    }
-
-    byId("previousRecord").textContent = previousDate
-        ? `前回 ${formatDate(previousDate)} · ${previousSets.map(formatSet).join(" / ")}`
+    byId("previous").textContent = date
+        ? `前回 ${date.replaceAll("-", "/")} · ${previousSets.map(formatSet).join(" / ")}`
         : "前回の記録はありません。";
 
-    byId("copyButton").hidden = previousSets.length === 0;
+    byId("copy").hidden = previousSets.length === 0;
 }
 
-function updateExerciseForm() {
-    const exercise = getExercise(byId("exerciseSelect").value);
+function resetRecordForm() {
+    const exercise = exerciseById(byId("exercise").value);
 
-    byId("setFields").hidden = !exercise;
-    byId("exerciseParts").textContent = describeExercise(exercise);
+    byId("set-fields").hidden = !exercise;
+    byId("exercise-parts").textContent = exercise ? describeExercise(exercise) : "";
 
-    fillSetRows(byId("setRows"), exercise ? [{}] : []);
-    updatePreviousRecord();
+    fillRows(byId("sets"), exercise ? [{}] : []);
+    updatePrevious();
 }
 
 function makeRecord(date, exercise, sets) {
@@ -345,17 +304,19 @@ function makeRecord(date, exercise, sets) {
 function saveRecord(event) {
     event.preventDefault();
 
-    const exercise = getExercise(byId("exerciseSelect").value);
+    const exercise = exerciseById(byId("exercise").value);
 
     if (screen !== "today" || !exercise) {
         return;
     }
 
-    const sets = readSets(byId("setRows"));
-    const record = makeRecord(getToday(), exercise, sets);
+    const sets = readRows(byId("sets"));
 
     try {
-        writeRecords([...readArray(RECORD_KEY), record]);
+        writeRecords([
+            ...readArray(RECORD_KEY),
+            makeRecord(todayKey(), exercise, sets)
+        ]);
     } catch {
         byId("message").textContent = "記録を保存できませんでした。";
         return;
@@ -363,18 +324,18 @@ function saveRecord(event) {
 
     byId("message").textContent = `${exercise.name}を${sets.length}セット記録しました。`;
 
-    updateExerciseForm();
+    resetRecordForm();
     renderWorkout();
 }
 
-function addCustomExercise(event) {
+function addCustom(event) {
     event.preventDefault();
 
-    const name = byId("customName").value.trim();
-    const part = byId("customPart").value;
+    const name = byId("custom-name").value.trim();
+    const part = byId("custom-part").value;
 
     if (screen !== "today" || !name || !Object.hasOwn(parts, part)) {
-        byId("message").textContent = "種目名と主に狙う部位を入力してください。";
+        byId("message").textContent = "種目名と部位を入力してください。";
         return;
     }
 
@@ -396,80 +357,71 @@ function addCustomExercise(event) {
             localStorage.setItem(CUSTOM_KEY, JSON.stringify([...saved, exercise]));
         }
 
-        if (!getExercise(exercise.id)) {
+        if (!exerciseById(exercise.id)) {
             exercises.push(exercise);
         }
 
-        const previous = byId("exerciseSelect").value;
+        const previous = byId("exercise").value;
 
         renderExerciseOptions(exercise.id);
 
         if (previous !== exercise.id) {
-            updateExerciseForm();
+            resetRecordForm();
         }
 
-        byId("customName").value = "";
-        byId("customDetails").open = false;
+        byId("custom-name").value = "";
+        byId("custom-details").open = false;
         byId("message").textContent = `「${name}」を選択しました。`;
     } catch {
         byId("message").textContent = "種目を追加できませんでした。";
     }
 }
 
-function matchesEdit(record, date, exerciseId) {
-    return record.date === date && record.exerciseId === exerciseId;
-}
-
-function getEditExercise() {
-    const id = byId("editExercise").value;
-
-    if (id === editing?.original.id) {
-        return editing.original;
-    }
-
-    return getExercise(id);
+function isEditRecord(record, date, id) {
+    return record.date === date && record.exerciseId === id;
 }
 
 function openEdit(date, entry) {
-    const original = {
-        id: entry.exerciseId,
-        name: entry.name,
-        main: [...entry.main],
-        secondary: getExercise(entry.exerciseId)?.secondary ?? []
-    };
-
     try {
-        const snapshot = readArray(RECORD_KEY).filter((record) => {
-            return matchesEdit(record, date, entry.exerciseId);
-        });
+        const latest = readArray(RECORD_KEY);
+        const batch = latest.filter((record) => isEditRecord(record, date, entry.exerciseId));
 
-        if (snapshot.length === 0) {
-            byId("message").textContent = "この記録は別の画面で変更されました。ページを更新してください。";
+        if (batch.length === 0) {
+            records = latest;
+            renderWorkout();
+            byId("message").textContent = "この記録はすでに変更されています。";
             return;
         }
+
+        const original = {
+            id: entry.exerciseId,
+            name: batch[0].name,
+            main: batch[0].main
+        };
 
         editing = {
             date,
             original,
-            snapshot: JSON.stringify(snapshot)
+            snapshot: JSON.stringify(batch)
         };
 
-        const select = byId("editExercise");
-        const available = exercises.filter((item) => item.id !== original.id);
+        const select = byId("edit-exercise");
 
-        select.replaceChildren(option(original.id, original.name));
-        appendExerciseGroup(select, "変更先の種目", available);
+        select.replaceChildren();
+        option(select, original.id, original.name);
 
-        byId("editDate").textContent = formatDate(date);
-        byId("editParts").textContent = describeExercise(original);
-        byId("editMessage").textContent = "";
-        byId("deleteDetails").open = false;
+        addExerciseGroup(
+            select,
+            "変更先の種目",
+            exercises.filter((item) => item.id !== original.id)
+        );
 
-        const sets = snapshot.flatMap((record) => record.sets);
+        byId("edit-date").textContent = date.replaceAll("-", "/");
+        byId("edit-message").textContent = "";
+        byId("delete-details").open = false;
 
-        fillSetRows(byId("editRows"), sets.length > 0 ? sets : [{}]);
-
-        byId("editDialog").showModal();
+        fillRows(byId("edit-sets"), batch.flatMap((record) => record.sets));
+        byId("edit-dialog").showModal();
     } catch {
         byId("message").textContent = "記録を開けませんでした。";
     }
@@ -482,15 +434,12 @@ function commitEdit(replacement) {
 
     try {
         const latest = readArray(RECORD_KEY);
-        const matches = (record) => {
-            return matchesEdit(record, editing.date, editing.original.id);
-        };
-
+        const matches = (record) => isEditRecord(record, editing.date, editing.original.id);
         const current = latest.filter(matches);
 
         if (JSON.stringify(current) !== editing.snapshot) {
-            byId("editMessage").textContent =
-                "この記録が別の画面で変更されました。編集を閉じ、ページを更新してから開き直してください。";
+            byId("edit-message").textContent =
+                "別の画面で記録が変更されました。閉じてから開き直してください。";
             return;
         }
 
@@ -500,10 +449,7 @@ function commitEdit(replacement) {
         for (const record of latest) {
             if (!matches(record)) {
                 next.push(record);
-                continue;
-            }
-
-            if (replacement && !inserted) {
+            } else if (replacement && !inserted) {
                 next.push(replacement);
                 inserted = true;
             }
@@ -511,200 +457,128 @@ function commitEdit(replacement) {
 
         writeRecords(next);
     } catch {
-        byId("editMessage").textContent = "変更を保存できませんでした。";
+        byId("edit-message").textContent = "変更を保存できませんでした。";
         return;
     }
 
-    byId("editDialog").close();
+    byId("edit-dialog").close();
+
+    updatePrevious();
+    renderWorkout();
+
     byId("message").textContent = replacement
         ? "記録を更新しました。"
         : "記録を削除しました。";
-
-    updatePreviousRecord();
-
-    if (screen === "historyDetail" && getEntries(historyDate).length === 0) {
-        switchScreen("history");
-    } else {
-        renderWorkout();
-    }
 }
 
 function saveEdit(event) {
     event.preventDefault();
 
-    const exercise = getEditExercise();
-
-    if (!editing || !exercise) {
+    if (!editing) {
         return;
     }
 
-    const sets = readSets(byId("editRows"));
-    const replacement = makeRecord(editing.date, exercise, sets);
+    const id = byId("edit-exercise").value;
+    const exercise = id === editing.original.id ? editing.original : exerciseById(id);
+    const sets = readRows(byId("edit-sets"));
 
-    commitEdit(replacement);
+    if (exercise && sets.length > 0) {
+        commitEdit(makeRecord(editing.date, exercise, sets));
+    }
 }
 
-function renderRecords(date, entries) {
-    const list = byId("recordList");
+function renderLog(date, entries) {
+    const list = byId("log");
 
     list.replaceChildren();
 
     if (entries.length === 0) {
-        appendText(list, "p", "表示できる記録はありません。", "muted");
-        return;
+        append(list, "p", "表示できる記録はありません。", "muted");
     }
 
     for (const entry of entries) {
-        const row = appendText(list, "article", "", "record-item");
+        const row = append(list, "article", "", "log-entry");
 
-        appendText(row, "strong", entry.name);
-        appendText(row, "p", entry.sets.map(formatSet).join("\n"));
+        append(row, "strong", entry.name);
+        append(row, "p", entry.sets.map(formatSet).join("\n"));
 
-        const editButton = appendButton(row, "編集", () => {
-            openEdit(date, entry);
-        });
+        const edit = button(row, "編集", () => openEdit(date, entry));
 
-        editButton.setAttribute("aria-label", `${entry.name}の記録を編集`);
+        edit.setAttribute("aria-label", `${entry.name}の記録を編集`);
     }
 }
 
+function openDay(date) {
+    activeDate = date;
+    switchScreen("detail");
+}
+
 function renderHistory() {
-    const list = byId("historyList");
+    const list = byId("history-list");
     const dates = [...new Set(records.map((record) => record.date))].sort().reverse();
 
     list.replaceChildren();
 
     if (dates.length === 0) {
-        appendText(list, "p", "保存したトレーニングがここに表示されます。", "muted");
-        return;
+        append(list, "p", "保存したトレーニングがここに表示されます。", "muted");
     }
 
     for (const date of dates) {
-        const entries = getEntries(date);
-        const label = `${formatDate(date)}　${entries.length}種目 / ${countSets(entries)}セット`;
+        const entries = entriesFor(date);
+        const sets = entries.reduce((sum, entry) => sum + entry.sets.length, 0);
 
-        appendButton(list, label, () => {
-            historyDate = date;
-            switchScreen("historyDetail");
+        button(list, `${date.replaceAll("-", "/")}　${entries.length}種目 ／ ${sets}セット`, () => {
+            openDay(date);
         });
     }
 }
 
-function hideMuscleTooltip() {
-    byId("muscleTooltip").hidden = true;
-}
-
-function showMuscleTooltip(event) {
-    const canvas = byId("bodyCanvas");
-    const partId = MuscleMap.hit(canvas, event, view);
-
-    if (!partId) {
-        hideMuscleTooltip();
-        return;
-    }
-
-    const tooltip = byId("muscleTooltip");
-    const stage = canvas.parentElement;
-    const bounds = stage.getBoundingClientRect();
-    const count = muscleCounts.get(partId) ?? 0;
-
-    tooltip.textContent = `${parts[partId].name} · ${count}種目`;
-    tooltip.hidden = false;
-
-    const x = event.clientX - bounds.left - stage.clientLeft + 14;
-    const y = event.clientY - bounds.top - stage.clientTop + 14;
-
-    const maxX = stage.clientWidth - tooltip.offsetWidth - 8;
-    const maxY = stage.clientHeight - tooltip.offsetHeight - 8;
-
-    tooltip.style.left = `${Math.max(8, Math.min(x, maxX))}px`;
-    tooltip.style.top = `${Math.max(8, Math.min(y, maxY))}px`;
-}
-
 function renderWorkout() {
-    hideMuscleTooltip();
+    byId("tooltip").hidden = true;
 
-    const date = screen === "today" ? getToday() : historyDate;
-    const entries = getEntries(date);
+    const isToday = screen === "today";
+    const date = isToday ? todayKey() : activeDate;
+    const entries = entriesFor(date);
     const part = parts[selectedPart];
 
+    todayCounts = new Map();
+
+    for (const entry of entries) {
+        for (const id of new Set(entry.main)) {
+            todayCounts.set(id, (todayCounts.get(id) ?? 0) + 1);
+        }
+    }
+
+    byId("date").textContent = date.replaceAll("-", "/");
+    byId("front").setAttribute("aria-pressed", String(view === "front"));
+    byId("back").setAttribute("aria-pressed", String(view === "back"));
+    byId("part").value = selectedPart;
+
+    MuscleMap.draw(byId("body"), view, todayCounts, new Set([selectedPart]));
+
+    byId("part-detail").hidden = !part;
+    byId("record-panel").hidden = !isToday;
+    byId("weekly").hidden = !isToday;
+
     const matching = entries.filter((entry) => entry.main.includes(selectedPart));
-    const filtering = screen === "historyDetail" && Boolean(part);
-
-    muscleCounts = countMuscles(entries);
-
-    byId("dateLabel").textContent = formatDate(date);
-    byId("stats").textContent = `${entries.length}種目 / ${countSets(entries)}セット`;
-    byId("partSelect").value = selectedPart;
-
-    byId("frontButton").setAttribute("aria-pressed", String(view === "front"));
-    byId("backButton").setAttribute("aria-pressed", String(view === "back"));
-
-    MuscleMap.draw(byId("bodyCanvas"), view, muscleCounts, selectedPart);
-
-    byId("partPanel").hidden = !part;
-    byId("recordPanel").hidden = screen !== "today";
 
     if (part) {
-        const names = matching.map((entry) => entry.name).join("・");
-
-        byId("partTitle").textContent = part.name;
-        byId("partDescription").textContent = part.description;
-
-        byId("partSummary").textContent = names
-            ? `${matching.length}種目 · ${names}`
+        byId("part-name").textContent = part.name;
+        byId("part-description").textContent = part.description;
+        byId("part-count").textContent = matching.length
+            ? `${matching.length}種目 · ${matching.map((entry) => entry.name).join("・")}`
             : "この部位を主に狙った種目は0件です。";
     }
 
-    byId("clearFilterButton").hidden = !filtering;
-    byId("recordTitle").textContent = screen === "today"
-        ? "今日の記録"
-        : "この日の記録";
+    const filtering = !isToday && Boolean(part);
 
-    renderRecords(date, filtering ? matching : entries);
-}
+    byId("log-title").textContent = isToday ? "今日の記録" : "この日の記録";
+    byId("clear-filter").hidden = !filtering;
 
-function switchScreen(next) {
-    screen = next;
+    renderLog(date, filtering ? matching : entries);
 
-    pauseMovement();
-    hideMuscleTooltip();
-
-    const workout = screen === "today" || screen === "historyDetail";
-
-    byId("dashboard").hidden = !workout;
-    byId("historyList").hidden = screen !== "history";
-    byId("stretchScreen").hidden = screen !== "stretch";
-
-    byId("todayButton").setAttribute("aria-pressed", String(screen === "today"));
-    byId("historyButton").setAttribute("aria-pressed", String(screen === "history" || screen === "historyDetail"));
-    byId("stretchButton").setAttribute("aria-pressed", String(screen === "stretch"));
-
-    byId("message").textContent = "";
-    byId("dateLabel").textContent = "";
-    byId("stats").textContent = "";
-
-    byId("pageTitle").textContent = {
-        today: "今日のトレーニング",
-        history: "トレーニング履歴",
-        historyDetail: "トレーニング詳細",
-        stretch: "ストレッチ一覧"
-    }[screen];
-
-    if (workout) {
-        selectedPart = "";
-        view = "front";
-
-        if (screen === "today") {
-            renderExerciseOptions(byId("exerciseSelect").value);
-            updatePreviousRecord();
-        }
-
-        renderWorkout();
-    } else if (screen === "history") {
-        renderHistory();
-    } else {
-        renderRoutine();
+    if (isToday) {
+        renderWeek();
     }
 }
 
@@ -716,13 +590,14 @@ function selectPart(id) {
     }
 
     if (screen === "today") {
-        const previous = byId("exerciseSelect").value;
+        const previous = byId("exercise").value;
 
-        byId("customPart").value = id;
+        byId("custom-part").value = id;
+
         renderExerciseOptions(previous, Boolean(id));
 
-        if (previous !== byId("exerciseSelect").value) {
-            updateExerciseForm();
+        if (previous !== byId("exercise").value) {
+            resetRecordForm();
         }
     }
 
@@ -734,56 +609,181 @@ function changeView(next) {
 
     if (selectedPart && parts[selectedPart].view !== next) {
         selectPart("");
+    } else {
+        renderWorkout();
+    }
+}
+
+function showTooltip(event) {
+    const canvas = byId("body");
+    const id = MuscleMap.hit(canvas, event, view);
+    const tooltip = byId("tooltip");
+
+    tooltip.hidden = !id;
+
+    if (!id) {
         return;
     }
 
-    renderWorkout();
+    const stage = canvas.parentElement;
+    const bounds = stage.getBoundingClientRect();
+
+    tooltip.textContent = `${parts[id].name} · ${todayCounts.get(id) ?? 0}種目`;
+
+    const x = event.clientX - bounds.left - stage.clientLeft + 12;
+    const y = event.clientY - bounds.top - stage.clientTop + 12;
+
+    tooltip.style.left = `${Math.max(6, Math.min(x, stage.clientWidth - tooltip.offsetWidth - 6))}px`;
+    tooltip.style.top = `${Math.max(6, Math.min(y, stage.clientHeight - tooltip.offsetHeight - 6))}px`;
+}
+
+function renderWeek() {
+    const dates = weekDates(weekOffset);
+    const datesSet = new Set(dates.map((date) => date.key));
+    const batch = records.filter((record) => datesSet.has(record.date));
+    const daily = new Map();
+    const counts = new Map();
+
+    for (const record of batch) {
+        const amount = record.sets.length;
+
+        if (amount === 0) {
+            continue;
+        }
+
+        daily.set(record.date, (daily.get(record.date) ?? 0) + amount);
+
+        for (const part of new Set(record.main)) {
+            counts.set(part, (counts.get(part) ?? 0) + amount);
+        }
+    }
+
+    const total = [...daily.values()].reduce((sum, amount) => sum + amount, 0);
+
+    byId("week-range").textContent = `${dates[0].short}–${dates[6].short}`;
+    byId("week-range").title = `${dates[0].key} ～ ${dates[6].key}`;
+    byId("next-week").disabled = weekOffset === 0;
+    byId("week-summary").textContent = `${daily.size}日 ／ ${total}セット`;
+
+    const selectedIds = new Set(weekSelection.ids);
+
+    for (const side of ["front", "back"]) {
+        MuscleMap.draw(byId(`week-${side}`), side, counts, selectedIds, true);
+    }
+
+    renderWeekGroups(byId("week-left"), ["chest", "shoulders", "biceps", "core", "quads"], batch);
+    renderWeekGroups(byId("week-right"), ["back", "triceps", "forearms", "glutes", "hamstrings", "calves"], batch);
+
+    const detail = byId("week-detail");
+
+    if (selectedIds.size === 0) {
+        detail.textContent = "部位を選ぶと、セット数・トレーニング日数・種目を確認できます。";
+    } else {
+        const matching = batch.filter((record) => {
+            return record.sets.length > 0 && record.main.some((id) => selectedIds.has(id));
+        });
+
+        const sets = matching.reduce((sum, record) => sum + record.sets.length, 0);
+        const days = new Set(matching.map((record) => record.date)).size;
+        const names = [...new Set(matching.map((record) => record.name))];
+
+        const breakdown = weekSelection.ids.length > 1
+            ? weekSelection.ids.map((id) => `${parts[id].name} ${counts.get(id) ?? 0}`).join(" ／ ")
+            : "";
+
+        detail.replaceChildren();
+        append(detail, "strong", `${weekSelection.label} · ${sets}セット · ${days}日`);
+
+        if (breakdown) {
+            append(detail, "p", breakdown);
+        }
+
+        if (names.length > 0) {
+            append(detail, "p", names.join("・"));
+        }
+    }
+
+    renderWeekBars(dates, daily);
+}
+
+function chooseWeekPart(label, ids) {
+    weekSelection = { label, ids };
+    renderWeek();
+}
+
+function renderWeekGroups(parent, keys, batch) {
+    parent.replaceChildren();
+
+    for (const key of keys) {
+        const [label, ids] = weekGroups[key];
+
+        const total = batch.reduce((sum, record) => {
+            const matches = record.main.some((id) => ids.includes(id));
+
+            return sum + (matches ? record.sets.length : 0);
+        }, 0);
+
+        const item = button(parent, label, () => {
+            chooseWeekPart(label, ids);
+            parent.querySelector(`[data-group="${key}"]`)?.focus();
+        });
+
+        item.dataset.group = key;
+        item.setAttribute("aria-pressed", String(weekSelection.ids === ids));
+        append(item, "strong", `${total}セット`);
+    }
+}
+
+function renderWeekBars(dates, daily) {
+    const list = byId("week-bars");
+    const max = Math.max(1, ...daily.values());
+
+    list.replaceChildren();
+
+    for (const date of dates) {
+        const count = daily.get(date.key) ?? 0;
+
+        const item = button(list, "", () => openDay(date.key));
+
+        item.disabled = count === 0;
+        item.setAttribute("aria-label", `${date.short} ${date.weekday}曜日 ${count}セット`);
+
+        append(item, "span", String(count));
+
+        const bar = append(item, "span", "", "bar");
+
+        bar.style.setProperty("--bar-height", `${58 * count / max}px`);
+        bar.setAttribute("aria-hidden", "true");
+
+        append(item, "span", date.weekday);
+    }
 }
 
 function pauseMovement() {
-    if (animationFrame !== null) {
-        cancelAnimationFrame(animationFrame);
+    if (frame !== null) {
+        cancelAnimationFrame(frame);
     }
 
-    animationFrame = null;
-    lastFrameTime = null;
-
-    byId("playButton").textContent = elapsed > 0 ? "再開" : "動きを再生";
+    frame = null;
+    lastFrame = null;
+    byId("play").textContent = elapsed > 0 ? "再開" : "動きを再生";
 }
 
 function drawMovement() {
-    const guide = Warmup.guides[activeGuideId];
+    const guide = Warmup.guides[guideId];
 
     if (!guide) {
         return;
     }
 
-    const cycle = elapsed % 4800;
-    let progress = 0;
-    let phase = "準備";
+    const cycle = elapsed % 4200;
+    const phase = Math.max(0, Math.min((cycle - 400) / 3400, 1));
 
-    if (cycle >= 700 && cycle < 2200) {
-        const fraction = (cycle - 700) / 1500;
+    const progress = guideId === "roll"
+        ? phase
+        : (1 - Math.cos(phase * Math.PI * 2)) / 2;
 
-        progress = (1 - Math.cos(fraction * Math.PI)) / 2;
-        phase = "動かす";
-    } else if (cycle >= 2200 && cycle < 2800) {
-        progress = 1;
-        phase = "動作の終点";
-    } else if (cycle >= 2800 && cycle < 4300) {
-        const fraction = (cycle - 2800) / 1500;
-
-        progress = (1 + Math.cos(fraction * Math.PI)) / 2;
-        phase = "戻す";
-    }
-
-    if (activeGuideId === "shoulderRoll" && cycle >= 700 && cycle < 4300) {
-        progress = (cycle - 700) / 3600;
-        phase = "肩を回す";
-    }
-
-    byId("movementPhase").textContent = phase;
-    Warmup.draw(byId("movementCanvas"), guide, progress);
+    Warmup.draw(byId("movement"), guide, progress);
 }
 
 function resetMovement() {
@@ -792,111 +792,130 @@ function resetMovement() {
     drawMovement();
 }
 
-function animateMovement(time) {
-    if (lastFrameTime !== null) {
-        const speed = Number(byId("speedSelect").value);
-
-        elapsed += Math.min(time - lastFrameTime, 100) * speed;
+function animate(time) {
+    if (lastFrame !== null) {
+        elapsed += Math.min(time - lastFrame, 100) * Number(byId("speed").value);
     }
 
-    lastFrameTime = time;
+    lastFrame = time;
 
     drawMovement();
 
-    animationFrame = requestAnimationFrame(animateMovement);
+    frame = requestAnimationFrame(animate);
 }
 
 function toggleMovement() {
-    if (animationFrame !== null) {
+    if (frame !== null) {
         pauseMovement();
         return;
     }
 
-    if (!activeGuideId || screen !== "stretch") {
-        return;
+    if (screen === "stretch" && guideId) {
+        byId("play").textContent = "一時停止";
+        frame = requestAnimationFrame(animate);
     }
-
-    byId("playButton").textContent = "一時停止";
-    animationFrame = requestAnimationFrame(animateMovement);
 }
 
 function selectMovement(id) {
+    guideId = id;
+
     const guide = Warmup.guides[id];
 
-    activeGuideId = id;
+    byId("movement-name").textContent = guide.name;
+    byId("equipment").textContent = guide.equipment;
+    byId("movement").setAttribute("aria-label", `${guide.name}の動作図`);
 
-    byId("movementName").textContent = guide.name;
-    byId("movementEquipment").textContent = guide.equipment;
-    byId("movementCanvas").setAttribute("aria-label", `${guide.name}の動作図`);
-
-    const steps = byId("movementSteps");
-
-    steps.replaceChildren();
+    byId("steps").replaceChildren();
 
     for (const step of guide.steps) {
-        appendText(steps, "li", step);
+        append(byId("steps"), "li", step);
     }
 
-    const source = byId("movementSource");
+    byId("source").href = guide.url;
+    byId("source").textContent = `参考資料 · ${guide.source}`;
 
-    source.href = guide.url;
-    source.textContent = `参考資料 · ${guide.source}`;
-
-    for (const button of byId("routineList").querySelectorAll("button")) {
-        button.setAttribute("aria-pressed", String(button.dataset.guide === id));
+    for (const item of byId("routine-list").querySelectorAll("button")) {
+        item.setAttribute("aria-pressed", String(item.dataset.guide === id));
     }
 
     resetMovement();
 }
 
 function renderRoutine() {
-    const routine = Warmup.routines[byId("routineSelect").value];
-    const list = byId("routineList");
-
-    byId("routineTitle").textContent = `${routine.name}のルーティン`;
-    byId("routineNote").textContent = routine.note;
+    const [, ...items] = Warmup.routines[byId("routine").value];
+    const list = byId("routine-list");
 
     list.replaceChildren();
 
-    for (const [id, amount] of routine.items) {
-        const item = appendText(list, "li", "");
+    for (const [id, amount] of items) {
         const guide = Warmup.guides[id];
+        const row = append(list, "li");
 
-        const button = appendButton(item, guide.name, () => {
-            selectMovement(id);
-        });
+        const item = button(row, `${guide.name} · ${amount}`, () => selectMovement(id));
 
-        button.dataset.guide = id;
-        appendText(button, "small", `${guide.equipment} · ${amount}`);
+        item.dataset.guide = id;
     }
 
-    selectMovement(routine.items[0][0]);
+    selectMovement(items[0][0]);
 }
 
-function openPartRoutine() {
-    const match = Object.entries(Warmup.routines).find(([, routine]) => {
-        return routine.parts.includes(selectedPart);
-    });
+function switchScreen(next) {
+    pauseMovement();
 
-    if (match) {
-        byId("routineSelect").value = match[0];
+    screen = next;
+
+    const workout = screen === "today" || screen === "detail";
+
+    byId("dashboard").hidden = !workout;
+    byId("history-list").hidden = screen !== "history";
+    byId("stretch-screen").hidden = screen !== "stretch";
+    byId("today").setAttribute("aria-pressed", String(screen === "today"));
+    byId("history").setAttribute("aria-pressed", String(screen === "history" || screen === "detail"));
+    byId("stretch").setAttribute("aria-pressed", String(screen === "stretch"));
+
+    byId("message").textContent = "";
+    byId("date").textContent = "";
+    byId("title").textContent = {
+        today: "今日のトレーニング",
+        history: "トレーニング履歴",
+        detail: "トレーニング詳細",
+        stretch: "ストレッチ一覧"
+    }[screen];
+
+    if (workout) {
+        selectedPart = "";
+        view = "front";
+
+        if (screen === "today") {
+            byId("custom-part").value = "";
+            renderExerciseOptions(byId("exercise").value);
+            updatePrevious();
+        }
+
+        renderWorkout();
+    } else if (screen === "history") {
+        renderHistory();
+    } else {
+        renderRoutine();
     }
-
-    switchScreen("stretch");
 }
 
 function bindEvents() {
-    byId("todayButton").addEventListener("click", () => switchScreen("today"));
-    byId("historyButton").addEventListener("click", () => switchScreen("history"));
-    byId("stretchButton").addEventListener("click", () => switchScreen("stretch"));
+    byId("today").addEventListener("click", () => switchScreen("today"));
+    byId("history").addEventListener("click", () => switchScreen("history"));
+    byId("stretch").addEventListener("click", () => switchScreen("stretch"));
 
-    byId("frontButton").addEventListener("click", () => changeView("front"));
-    byId("backButton").addEventListener("click", () => changeView("back"));
+    byId("front").addEventListener("click", () => changeView("front"));
+    byId("back").addEventListener("click", () => changeView("back"));
+    byId("part").addEventListener("change", (event) => selectPart(event.target.value));
+    byId("clear-filter").addEventListener("click", () => selectPart(""));
 
-    const canvas = byId("bodyCanvas");
+    const canvas = byId("body");
 
-    canvas.addEventListener("pointermove", showMuscleTooltip);
-    canvas.addEventListener("pointerleave", hideMuscleTooltip);
+    canvas.addEventListener("pointermove", showTooltip);
+    canvas.addEventListener("pointerleave", () => {
+        byId("tooltip").hidden = true;
+    });
 
     canvas.addEventListener("click", (event) => {
         const id = MuscleMap.hit(canvas, event, view);
@@ -906,77 +925,130 @@ function bindEvents() {
         }
     });
 
-    byId("partSelect").addEventListener("change", (event) => {
-        selectPart(event.target.value);
-    });
+    byId("exercise").addEventListener("change", resetRecordForm);
+    byId("add-set").addEventListener("click", () => addRow(byId("sets")));
+    byId("copy").addEventListener("click", () => fillRows(byId("sets"), previousSets));
+    byId("record-form").addEventListener("submit", saveRecord);
+    byId("custom-form").addEventListener("submit", addCustom);
 
-    byId("partStretchButton").addEventListener("click", openPartRoutine);
-    byId("clearFilterButton").addEventListener("click", () => selectPart(""));
-    byId("exerciseSelect").addEventListener("change", updateExerciseForm);
+    byId("edit-form").addEventListener("submit", saveEdit);
+    byId("edit-add").addEventListener("click", () => addRow(byId("edit-sets")));
+    byId("delete").addEventListener("click", () => commitEdit(null));
 
-    byId("addSetButton").addEventListener("click", () => {
-        addSetRow(byId("setRows"));
-    });
+    const dialog = byId("edit-dialog");
 
-    byId("copyButton").addEventListener("click", () => {
-        fillSetRows(byId("setRows"), previousSets);
-    });
-
-    byId("recordForm").addEventListener("submit", saveRecord);
-    byId("customForm").addEventListener("submit", addCustomExercise);
-
-    const dialog = byId("editDialog");
-
-    byId("closeEditButton").addEventListener("click", () => dialog.close());
+    byId("close-edit").addEventListener("click", () => dialog.close());
 
     dialog.addEventListener("close", () => {
         editing = null;
     });
 
-    byId("editExercise").addEventListener("change", () => {
-        byId("editParts").textContent = describeExercise(getEditExercise());
+    byId("prev-week").addEventListener("click", () => {
+        weekOffset -= 1;
+        renderWeek();
     });
 
-    byId("editAddSetButton").addEventListener("click", () => {
-        addSetRow(byId("editRows"));
+    byId("next-week").addEventListener("click", () => {
+        if (weekOffset < 0) {
+            weekOffset += 1;
+            renderWeek();
+
+            if (weekOffset === 0) {
+                byId("prev-week").focus();
+            }
+        }
     });
 
-    byId("editForm").addEventListener("submit", saveEdit);
+    for (const side of ["front", "back"]) {
+        const model = byId(`week-${side}`);
 
-    byId("deleteRecordButton").addEventListener("click", () => {
-        commitEdit(null);
+        model.addEventListener("click", (event) => {
+            const id = MuscleMap.hit(model, event, side);
+
+            if (id) {
+                chooseWeekPart(parts[id].name, [id]);
+            }
+        });
+    }
+
+    byId("part-routine").addEventListener("click", () => {
+        byId("routine").value = parts[selectedPart].group;
+        switchScreen("stretch");
     });
 
-    byId("routineSelect").addEventListener("change", renderRoutine);
-    byId("playButton").addEventListener("click", toggleMovement);
-    byId("resetButton").addEventListener("click", resetMovement);
+    byId("routine").addEventListener("change", renderRoutine);
+    byId("play").addEventListener("click", toggleMovement);
+    byId("reset").addEventListener("click", resetMovement);
 
     document.addEventListener("visibilitychange", () => {
-        if (document.hidden && animationFrame !== null) {
+        if (document.hidden && frame !== null) {
             pauseMovement();
+        }
+    });
+
+    window.addEventListener("storage", (event) => {
+        if (event.key !== RECORD_KEY) {
+            return;
+        }
+
+        try {
+            records = readArray(RECORD_KEY);
+
+            updatePrevious();
+
+            if (screen === "history") {
+                renderHistory();
+            } else if (screen !== "stretch") {
+                renderWorkout();
+            }
+        } catch {
+            byId("message").textContent = "別の画面の記録を読み込めませんでした。";
         }
     });
 }
 
 async function start() {
     try {
-        exercises = [...await loadExercises(), ...readArray(CUSTOM_KEY)];
+        const response = await fetch("work.csv");
+
+        if (!response.ok) {
+            throw new Error("work.csvを読み込めませんでした。");
+        }
+
+        const csv = await response.text();
+        const builtIn = new Map();
+
+        for (const line of csv.trim().split(/\r?\n/).slice(1)) {
+            if (!line.trim()) {
+                continue;
+            }
+
+            const [id, name, main, secondary] = line.split(",");
+
+            builtIn.set(id, {
+                id,
+                name,
+                main: main.split("|"),
+                secondary: secondary ? secondary.split("|") : []
+            });
+        }
+
+        exercises = [...builtIn.values(), ...readArray(CUSTOM_KEY)];
         records = readArray(RECORD_KEY);
 
-        fillPartSelect(byId("partSelect"));
-        fillPartSelect(byId("customPart"));
+        fillParts(byId("part"));
+        fillParts(byId("custom-part"));
 
-        for (const [id, routine] of Object.entries(Warmup.routines)) {
-            byId("routineSelect").append(option(id, routine.name));
+        for (const [id, [name]] of Object.entries(Warmup.routines)) {
+            option(byId("routine"), id, name);
         }
 
         renderExerciseOptions();
-        updateExerciseForm();
+        resetRecordForm();
         bindEvents();
         switchScreen("today");
     } catch (error) {
-        byId("message").textContent =
-            `起動できませんでした。Live Serverで開いてください。 ${error.message}`;
+        byId("message").textContent = `起動できませんでした。${error.message} Live Serverから開いてください。`;
     }
 }
 

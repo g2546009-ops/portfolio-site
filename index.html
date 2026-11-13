@@ -4,130 +4,103 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Muscle Log</title>
-
     <link rel="stylesheet" href="style.css">
     <script src="sketch.js" defer></script>
     <script src="works.js" defer></script>
 </head>
-
 <body>
     <header class="site-header">
-        <div class="container header-content">
-            <a class="brand" href="index.html">MUSCLE<span>LOG</span></a>
+        <div class="container heading">
+            <a href="./" class="brand">MUSCLE <span>LOG</span></a>
 
-            <nav class="segmented" aria-label="画面切り替え">
-                <button id="todayButton" type="button" aria-pressed="true">今日</button>
-                <button id="historyButton" type="button" aria-pressed="false">履歴</button>
-                <button id="stretchButton" type="button" aria-pressed="false">ストレッチ一覧</button>
+            <nav aria-label="画面切り替え">
+                <button id="today" type="button" aria-pressed="true">今日</button>
+                <button id="history" type="button" aria-pressed="false">履歴</button>
+                <button id="stretch" type="button" aria-pressed="false">ストレッチ一覧</button>
             </nav>
         </div>
     </header>
 
     <main class="container">
-        <div class="panel-heading page-heading">
-            <div>
-                <p id="dateLabel" class="accent"></p>
-                <h1 id="pageTitle">今日のトレーニング</h1>
-            </div>
-
-            <p id="stats" class="muted"></p>
-        </div>
-
+        <p id="date" class="muted"></p>
+        <h1 id="title">今日のトレーニング</h1>
         <p id="message" role="status"></p>
 
-        <section id="historyList" class="panel history-list" hidden>
-        </section>
+        <section id="history-list" class="panel" hidden aria-label="日付別の履歴"></section>
 
         <div id="dashboard" class="dashboard">
-            <section class="panel map-panel">
-                <div class="panel-heading">
+            <section class="panel">
+                <div class="heading">
                     <h2>筋肉マップ</h2>
 
                     <div class="segmented" role="group" aria-label="マネキンの向き">
-                        <button id="frontButton" type="button" aria-pressed="true">前面</button>
-                        <button id="backButton" type="button" aria-pressed="false">背面</button>
+                        <button id="front" type="button" aria-pressed="true">前面</button>
+                        <button id="back" type="button" aria-pressed="false">背面</button>
                     </div>
                 </div>
 
                 <div class="map-stage">
-                    <canvas
-                        id="bodyCanvas"
-                        width="640"
-                        height="1000"
-                        role="img"
-                        aria-label="筋肉マップ。下の部位一覧からも選択できます。"
-                    ></canvas>
+                    <canvas id="body" width="640" height="1000" role="img"
+                        aria-label="筋肉マップ。下の一覧からも部位を選べます。"></canvas>
 
-                    <div id="muscleTooltip" aria-hidden="true" hidden></div>
+                    <span id="tooltip" hidden aria-hidden="true"></span>
                 </div>
 
-                <p class="muted small">その部位を主に狙った種目数</p>
+                <p class="muted">部位を主に狙った種目数</p>
+                <p class="legend today-legend">0種目　／　1種目　／　2種目　／　3種目以上</p>
 
-                <div class="legend">
-                    <span><i class="level-0"></i>0種目</span>
-                    <span><i class="level-1"></i>1種目</span>
-                    <span><i class="level-2"></i>2種目</span>
-                    <span><i class="level-3"></i>3種目以上</span>
+                <label for="part">部位を選ぶ</label>
+                <select id="part"></select>
+
+                <div id="part-detail" hidden>
+                    <h3 id="part-name"></h3>
+                    <p id="part-description"></p>
+                    <p id="part-count" class="muted"></p>
+                    <button id="part-routine" type="button">この部位のルーティンを見る</button>
                 </div>
-
-                <label for="partSelect">部位から選ぶ</label>
-                <select id="partSelect"></select>
             </section>
 
             <div class="stack">
-                <section id="partPanel" class="panel" hidden>
-                    <h2 id="partTitle"></h2>
-                    <p id="partDescription" class="muted"></p>
-                    <p id="partSummary" class="accent"></p>
-
-                    <button id="partStretchButton" type="button">
-                        この部位のルーティンを見る
-                    </button>
-                </section>
-
-                <section id="recordPanel" class="panel">
+                <section id="record-panel" class="panel">
                     <h2>セットを記録</h2>
 
-                    <form id="recordForm">
-                        <label for="exerciseSelect">種目</label>
-                        <select id="exerciseSelect" required></select>
+                    <form id="record-form">
+                        <label for="exercise">種目</label>
+                        <select id="exercise" required></select>
 
-                        <div id="setFields" hidden>
-                            <p id="exerciseParts" class="muted"></p>
+                        <div id="set-fields" hidden>
+                            <p id="exercise-parts" class="muted"></p>
 
                             <div class="previous">
-                                <p id="previousRecord"></p>
-
-                                <button id="copyButton" type="button" hidden>
-                                    前回をコピー
-                                </button>
+                                <p id="previous"></p>
+                                <button id="copy" type="button" hidden>前回をコピー</button>
                             </div>
 
-                            <div class="set-grid set-headings" aria-hidden="true">
+                            <div class="set-grid muted" aria-hidden="true">
                                 <span>セット</span>
                                 <span>重量（kg）</span>
                                 <span>回数</span>
                                 <span></span>
                             </div>
 
-                            <div id="setRows"></div>
+                            <div id="sets"></div>
 
-                            <div class="actions">
-                                <button id="addSetButton" type="button">＋ セット</button>
+                            <div class="heading">
+                                <button id="add-set" type="button">＋ セット</button>
                                 <button class="primary" type="submit">記録を保存</button>
                             </div>
                         </div>
                     </form>
 
-                    <details id="customDetails">
+                    <details id="custom-details">
                         <summary>＋ 自分の種目を追加</summary>
 
-                        <form id="customForm">
-                            <label for="customName">種目名</label>
-                            <input id="customName" maxlength="60" required>
+                        <form id="custom-form">
+                            <label for="custom-name">種目名</label>
+                            <input id="custom-name" maxlength="60" required>
 
-                            <label for="customPart">主に狙う部位</label>
-                            <select id="customPart" required></select>
+                            <label for="custom-part">主に狙う部位</label>
+                            <select id="custom-part" required></select>
 
                             <button type="submit">種目を追加</button>
                         </form>
@@ -135,116 +108,129 @@
                 </section>
 
                 <section class="panel">
-                    <div class="panel-heading">
-                        <h2 id="recordTitle">今日の記録</h2>
-
-                        <button id="clearFilterButton" type="button" hidden>
-                            全部位を表示
-                        </button>
+                    <div class="heading">
+                        <h2 id="log-title">今日の記録</h2>
+                        <button id="clear-filter" type="button" hidden>全部位を表示</button>
                     </div>
 
-                    <div id="recordList"></div>
+                    <div id="log"></div>
+                </section>
+
+                <section id="weekly" class="panel weekly">
+                    <div class="heading week-heading">
+                        <h2>週間トレーニング分析</h2>
+
+                        <div class="week-nav" role="group" aria-label="集計する週">
+                            <button id="prev-week" type="button" aria-label="前週">‹</button>
+                            <span id="week-range"></span>
+                            <button id="next-week" type="button" aria-label="次週">›</button>
+                        </div>
+                    </div>
+
+                    <p id="week-summary" class="week-summary"></p>
+                    <h3>部位別セット数</h3>
+
+                    <div class="week-body">
+                        <div id="week-left" class="week-parts"></div>
+
+                        <div class="week-model">
+                            <canvas id="week-front" width="320" height="500"
+                                role="img" aria-label="週間筋肉マップの前面"></canvas>
+                            <span>前面</span>
+                        </div>
+
+                        <div class="week-model">
+                            <canvas id="week-back" width="320" height="500"
+                                role="img" aria-label="週間筋肉マップの背面"></canvas>
+                            <span>背面</span>
+                        </div>
+
+                        <div id="week-right" class="week-parts"></div>
+                    </div>
+
+                    <div class="legend week-legend" aria-label="週間マップの色の凡例">
+                        <span><i></i>0</span>
+                        <span><i></i>1〜3</span>
+                        <span><i></i>4〜7</span>
+                        <span><i></i>8以上</span>
+                    </div>
+
+                    <p id="week-detail" class="week-detail" aria-live="polite"></p>
+
+                    <h3>曜日別セット数</h3>
+                    <div id="week-bars" class="week-bars"></div>
                 </section>
             </div>
         </div>
 
-        <section id="stretchScreen" class="stretch-layout" hidden>
+        <section id="stretch-screen" class="stretch-layout" hidden>
             <div class="panel">
-                <label for="routineSelect">今日鍛える部位</label>
-                <select id="routineSelect"></select>
-
-                <h2 id="routineTitle"></h2>
-                <p id="routineNote" class="muted"></p>
-
-                <ol id="routineList" class="routine-list"></ol>
-
-                <p class="muted small">
-                    軽く身体を動かしてから、痛みのない範囲で行ってください。
-                    器具を使う任意メニューは、器具が空いているときに選べます。
-                </p>
+                <label for="routine">今日鍛える部位</label>
+                <select id="routine"></select>
+                <ol id="routine-list"></ol>
             </div>
 
             <div class="panel">
-                <div class="panel-heading">
-                    <h2 id="movementName"></h2>
-                    <span id="movementEquipment" class="equipment"></span>
+                <div class="heading">
+                    <h2 id="movement-name"></h2>
+                    <span id="equipment" class="muted"></span>
                 </div>
 
-                <figure class="movement-stage">
-                    <canvas
-                        id="movementCanvas"
-                        width="960"
-                        height="540"
-                        role="img"
-                        aria-describedby="movementSteps"
-                    ></canvas>
-
-                    <figcaption id="movementPhase">準備</figcaption>
-                </figure>
+                <canvas id="movement" width="960" height="480" role="img"
+                    aria-describedby="steps"></canvas>
 
                 <div class="movement-controls">
-                    <button id="playButton" type="button">動きを再生</button>
-                    <button id="resetButton" type="button">最初に戻す</button>
+                    <button id="play" type="button">動きを再生</button>
+                    <button id="reset" type="button">最初に戻す</button>
 
-                    <label for="speedSelect">速度</label>
-                    <select id="speedSelect">
+                    <label for="speed">速度</label>
+                    <select id="speed">
                         <option value="1">通常</option>
                         <option value="0.55">ゆっくり</option>
                     </select>
                 </div>
 
-                <ol id="movementSteps"></ol>
-
-                <a id="movementSource" target="_blank" rel="noopener">
-                    参考資料
-                </a>
+                <ol id="steps"></ol>
+                <p class="muted">ゆっくり、痛みのない範囲で動かしてください。</p>
+                <a id="source" target="_blank" rel="noopener noreferrer">参考資料</a>
             </div>
         </section>
     </main>
 
-    <dialog id="editDialog" aria-labelledby="editTitle">
-        <div class="panel-heading">
+    <dialog id="edit-dialog" aria-labelledby="edit-title">
+        <div class="heading">
             <div>
-                <p id="editDate" class="accent small"></p>
-                <h2 id="editTitle">トレーニング記録を編集</h2>
+                <p id="edit-date" class="muted"></p>
+                <h2 id="edit-title">記録を編集</h2>
             </div>
 
-            <button id="closeEditButton" type="button" aria-label="編集を閉じる">
-                ×
-            </button>
+            <button id="close-edit" type="button" aria-label="閉じる">×</button>
         </div>
 
-        <form id="editForm">
-            <label for="editExercise">種目</label>
-            <select id="editExercise" required></select>
+        <form id="edit-form">
+            <label for="edit-exercise">種目</label>
+            <select id="edit-exercise" required></select>
 
-            <p id="editParts" class="muted"></p>
-
-            <div class="set-grid set-headings" aria-hidden="true">
+            <div class="set-grid muted" aria-hidden="true">
                 <span>セット</span>
                 <span>重量（kg）</span>
                 <span>回数</span>
                 <span></span>
             </div>
 
-            <div id="editRows"></div>
+            <div id="edit-sets"></div>
+            <p id="edit-message" role="status"></p>
 
-            <p id="editMessage" role="status"></p>
-
-            <div class="actions">
-                <button id="editAddSetButton" type="button">＋ セット</button>
+            <div class="heading">
+                <button id="edit-add" type="button">＋ セット</button>
                 <button class="primary" type="submit">変更を保存</button>
             </div>
         </form>
 
-        <details id="deleteDetails">
+        <details id="delete-details">
             <summary>この種目の記録を削除</summary>
-
-            <p>この日付のこの種目について、すべてのセットを削除します。</p>
-
-            <button id="deleteRecordButton" class="danger" type="button">
-                削除を確定
-            </button>
+            <p>この日付の、この種目の全セットを削除します。</p>
+            <button id="delete" type="button">削除を確定</button>
         </details>
     </dialog>
 </body>
